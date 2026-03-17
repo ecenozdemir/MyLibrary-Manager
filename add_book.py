@@ -4,34 +4,58 @@ import os
 
 def get_book_details(isbn):
     url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        if 'items' in data:
-            book_info = data['items'][0]['volumeInfo']
-            title = book_info.get('title', 'Bilinmiyor')
-            authors = ", ".join(book_info.get('authors', ['Bilinmiyor']))
-            return title, authors
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            if 'items' in data:
+                book_info = data['items'][0]['volumeInfo']
+                title = book_info.get('title', 'Bilinmiyor')
+                authors = ", ".join(book_info.get('authors', ['Bilinmiyor']))
+                return title, authors
+    except:
+        pass
     return None, None
 
-def add_to_library(isbn):
-    # Önce mükerrer kontrolü yapalım
+def add_to_library():
+    isbn = input("📚 Eklemek istediğin kitabın ISBN numarasını gir: ")
+    
+    # 1. Mükerrer Kontrolü
     if os.path.exists('books_db.csv'):
         df = pd.read_csv('books_db.csv')
         if str(isbn) in df['isbn'].astype(str).values:
-            print(f"🚨 UYARI: Bu kitap zaten kayıtlı!")
+            book_info = df[df['isbn'].astype(str) == str(isbn)]
+            print(f"🚨 UYARI: Bu kitap zaten kütüphanende kayıtlı! ({book_info['title'].values[0]})")
             return
 
-    # İnternetten bilgileri çek
+    # 2. Otomatik Bilgi Getirme
     title, author = get_book_details(isbn)
+    
     if title:
-        new_data = pd.DataFrame([[isbn, title, author, 'Okunmadı']], 
-                                columns=['isbn', 'title', 'author', 'status'])
-        new_data.to_csv('books_db.csv', mode='a', header=not os.path.exists('books_db.csv'), index=False)
-        print(f"✅ EKLENDİ: {title} - {author}")
+        print(f"\n🔍 Bulunan Bilgi:")
+        print(f"Kitap: {title}")
+        print(f"Yazar: {author}")
+        onay = input("\nBu bilgiler doğru mu? (E/H): ").upper()
+        
+        if onay != 'E':
+            print("\n✍️ O zaman bilgileri manuel girelim:")
+            title = input("Kitabın tam adını yaz: ")
+            author = input("Yazarın adını yaz: ")
     else:
-        print("❌ HATA: Kitap bilgileri bulunamadı.")
+        print("\n❌ İnternette bu ISBN ile ilgili bilgi bulunamadı.")
+        title = input("✍️ Kitabın adını manuel gir: ")
+        author = input("✍️ Yazarın adını manuel gir: ")
 
-# Kullanım
-isbn_input = input("Eklemek istediğin kitabın ISBN numarasını gir: ")
-add_to_library(isbn_input)
+    # 3. Kaydetme
+    status = input("Okuma durumu (Okundu/Okunmadı/Okunuyor): ")
+    
+    new_data = pd.DataFrame([[isbn, title, author, status]], 
+                            columns=['isbn', 'title', 'author', 'status'])
+    
+    file_exists = os.path.isfile('books_db.csv')
+    new_data.to_csv('books_db.csv', mode='a', header=not file_exists, index=False)
+    
+    print(f"\n✅ BAŞARILI: '{title}' envanterine eklendi!")
+
+if __name__ == "__main__":
+    add_to_library()
